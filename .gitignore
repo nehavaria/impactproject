@@ -1,0 +1,37 @@
+# Virtual environment
+venv/
+env/
+.venv/
+.env
+
+# Database files
+*.db
+database/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Large ML model files
+*.pkl
+*.h5
+*.model
+weatherHistory.csv

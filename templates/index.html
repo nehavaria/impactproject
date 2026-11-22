@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NEBULA AI WEATHER</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="weather-{{ weather_type }}">
+
+<canvas id="weather-canvas"></canvas>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+<div class="bg-orb orb3"></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <span class="logo-icon">&#127756;</span>
+        <span class="logo-text">NEBULA AI</span>
+    </div>
+    <div class="sidebar-user">
+        <div class="avatar">{{ username[0].upper() }}</div>
+        <div>
+            <div class="user-name">{{ username }}</div>
+            <div class="user-role">Weather Analyst</div>
+        </div>
+    </div>
+    <nav class="menu">
+        <a href="/" class="menu-item active"><span class="menu-icon">&#127968;</span> Dashboard</a>
+        <a href="/profile" class="menu-item"><span class="menu-icon">&#128100;</span> My Profile</a>
+        <a href="#weather-card" class="menu-item"><span class="menu-icon">&#127780;</span> Live Weather</a>
+        <a href="#forecast-section" class="menu-item"><span class="menu-icon">&#128197;</span> Forecast</a>
+        <a href="#ai-section" class="menu-item"><span class="menu-icon">&#129302;</span> AI Analysis</a>
+        <a href="#aqi-section" class="menu-item"><span class="menu-icon">&#127757;</span> AQI</a>
+        <a href="#health-section" class="menu-item"><span class="menu-icon">&#129516;</span> Health Risks</a>
+        <a href="#food-section" class="menu-item"><span class="menu-icon">&#127860;</span> Food Guide</a>
+        <a href="#pet-section" class="menu-item"><span class="menu-icon">&#128062;</span> Pet Safety</a>
+        <a href="#plant-section" class="menu-item"><span class="menu-icon">&#127807;</span> Plant Care</a>
+        <a href="#photo-section" class="menu-item"><span class="menu-icon">&#128247;</span> Photography</a>
+        <a href="#farming-section" class="menu-item"><span class="menu-icon">&#127806;</span> Farming</a>
+        <a href="#energy-section" class="menu-item"><span class="menu-icon">&#9889;</span> Energy</a>
+        <div class="menu-divider"></div>
+        <a href="/logout" class="menu-item"><span class="menu-icon">&#128682;</span> Logout</a>
+    </nav>
+    {% if favorites %}
+    <div class="history-panel">
+        <div class="history-title">&#11088; Favorites</div>
+        {% for f in favorites %}
+        <a href="/?city={{ f }}" class="history-item"><span>&#11088;</span> {{ f }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if history %}
+    <div class="history-panel">
+        <div class="history-title">Recent Searches</div>
+        {% for h in history %}
+        <a href="/?city={{ h }}" class="history-item"><span>&#128336;</span> {{ h }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">&#9776;</button>
+
+<!-- MAIN -->
+<div class="main" id="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <h2>Good <span id="greeting"></span>, <span class="highlight">{{ username }}</span> &#128075;</h2>
+        </div>
+        <div class="topbar-right">
+            <div class="clock-box">
+                <div id="clock"></div>
+                <div id="date-display"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLASH -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">
+            {% if category == 'error' %}⚠️{% else %}✅{% endif %} {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- SEARCH -->
+    <div class="search-section">
+        <form method="GET" action="/" id="search-form">
+            <div class="search-box">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" name="city" id="city-input"
+                    placeholder="Search any city worldwide..."
+                    value="{{ city or '' }}" autocomplete="off" required>
+                <button type="button" id="voice-btn" title="Voice Search" onclick="startVoice()">&#127908;</button>
+                <button type="submit" id="search-btn">
+                    <span id="btn-text">Analyze</span>
+                    <span id="btn-spinner" style="display:none">&#9203;</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if weather %}
+
+    <!-- DISASTER ALERTS -->
+    {% if alerts %}
+    <div class="alerts-section">
+        {% for alert in alerts %}
+        <div class="alert-banner alert-{{ alert.level }}">
+            <span class="alert-icon">{{ alert.icon }}</span>
+            <div>
+                <div class="alert-title">{{ alert.title }}</div>
+                <div class="alert-msg">{{ alert.msg }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- CITY BACKGROUND HERO -->
+    {% if city_bg %}
+    <div class="city-hero" style="background-image: url('{{ city_bg }}')">
+        <div class="city-hero-overlay">
+            <div class="city-hero-name">{{ weather.city }}</div>
+            <div class="city-hero-desc">{{ weather.description }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MAIN WEATHER CARD -->
+    <div class="weather-card" id="weather-card">
+        <div class="weather-left">
+            <div class="city-name">{{ weather.city }}</div>
+            <div class="weather-temp" id="temp-display"
+                data-c="{{ weather.temp }}"
+                data-f="{{ (weather.temp * 9/5 + 32) | round(1) }}">
+                {{ weather.temp }}&deg;C
+            </div>
+            <div class="weather-desc">{{ weather.description }}</div>
+            <div class="feels-like">Feels like
+                <span id="feels-display"
+                    data-c="{{ weather.feels_like }}"
+                    data-f="{{ (weather.feels_like * 9/5 + 32) | round(1) }}">
+                    {{ weather.feels_like }}&deg;C
+                </span>
+            </div>
+            <div class="unit-toggle">
+                <button class="unit-btn active" id="btn-c" onclick="setUnit('C')">&deg;C</button>
+                <button class="unit-btn" id="btn-f" onclick="setUnit('F')">&deg;F</button>
+            </div>
+            <button class="speak-btn" onclick="speakWeather()">&#128266; Read Aloud</button>
+            <button class="fav-btn {% if is_favorite %}fav-active{% endif %}"
+                id="fav-btn" onclick="toggleFavorite('{{ weather.city }}')">
+                {% if is_favorite %}&#11088; Saved{% else %}&#9734; Save City{% endif %}
+            </button>
+        </div>
+        <div class="weather-right">
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-icon">&#128167;</div>
+                    <div class="stat-label">Humidity</div>
+                    <div class="stat-value">{{ weather.humidity }}%</div>
+                    <div class="stat-bar"><div class="stat-fill" data-width="{{ weather.humidity }}"></div></div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">&#128168;</div>
+                    <div class="stat-label">Wind Speed</div>
+                    <div class="stat-value">{{ weather.wind }} km/h</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">&#127777;</div>
+                    <div class="stat-label">Pressure</div>
+                    <div class="stat-value">{{ weather.pressure }} mb</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">&#128065;</div>
+                    <div class="stat-label">Visibility</div>
+                    <div class="stat-value">{{ weather.visibility }} km</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">&#9728;</div>
+                    <div class="stat-label">UV Index</div>
+                    <div class="stat-value">{{ weather.uv_index }}</div>
+                    <div class="stat-bar"><div class="stat-fill uv-fill" data-width="{{ [weather.uv_index * 9, 100] | min }}"></div></div>
+                </div>
+                <div class="stat-box prediction-box">
+                    <div class="stat-icon">&#129302;</div>
+                    <div class="stat-label">AI Prediction</div>
+                    <div class="stat-value prediction-text">{{ weather.prediction }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FEATURE ROW: AI Analysis + Outfit + Mood -->
+    <div class="feature-row" id="ai-section">
+        <div class="feature-card ai-card">
+            <div class="feature-header">
+                <span>&#129504;</span> AI Weather Analysis
+                <span class="ai-badge">LIVE</span>
+            </div>
+            <div class="ai-lines">
+                {% for line in ai_analysis %}
+                <div class="ai-line">{{ line }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="feature-card outfit-card">
+            <div class="feature-header"><span>&#128084;</span> Outfit Recommendation</div>
+            <div class="outfit-icon">{{ outfit.icon }}</div>
+            <div class="outfit-title">{{ outfit.title }}</div>
+            <div class="outfit-tip">{{ outfit.tip }}</div>
+        </div>
+        <div class="feature-card mood-card">
+            <div class="feature-header"><span>&#129496;</span> Mood &amp; Activity</div>
+            <div class="mood-emoji">{{ mood.emoji }}</div>
+            <div class="mood-message">{{ mood.message }}</div>
+        </div>
+    </div>
+
+    <!-- AQI -->
+    {% if aqi %}
+    <div class="section-title" id="aqi-section">&#127757; Air Quality Index</div>
+    <div class="aqi-card">
+        <div class="aqi-left">
+            <div class="aqi-number" data-color="{{ aqi.color }}">{{ aqi.aqi }}</div>
+            <div class="aqi-level" data-color="{{ aqi.color }}">{{ aqi.level }}</div>
+            <div class="aqi-pm">PM2.5: {{ aqi.pm25 }} &micro;g/m&sup3;</div>
+        </div>
+        <div class="aqi-right">
+            <div class="aqi-bar-track">
+                <div class="aqi-bar-fill" data-width="{{ [aqi.aqi / 3, 100] | min }}" data-color="{{ aqi.color }}"></div>
+            </div>
+            <div class="aqi-advice">{{ aqi.advice }}</div>
+            <div class="aqi-scale">
+                <span style="color:#22c55e">Good</span>
+                <span style="color:#eab308">Moderate</span>
+                <span style="color:#f97316">Unhealthy</span>
+                <span style="color:#ef4444">Hazardous</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- HEALTH RISK ENGINE -->
+    {% if health %}
+    <div class="section-title" id="health-section">&#129516; AI Health Risk Engine</div>
+    <div class="health-grid">
+        {% for h in health %}
+        <div class="health-card health-{{ h.level }}">
+            <div class="health-icon">{{ h.icon }}</div>
+            <div class="health-risk">{{ h.risk }}</div>
+            <div class="health-detail">{{ h.detail }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- PRODUCTIVITY PREDICTOR -->
+    {% if productivity %}
+    <div class="section-title">&#129504; Mood &amp; Productivity Predictor</div>
+    <div class="productivity-card">
+        <div class="prod-left">
+            <div class="prod-score-label">Productivity Score</div>
+            <div class="prod-score">{{ productivity.score }}<span>/100</span></div>
+            <div class="prod-bar-track"><div class="prod-bar-fill" data-width="{{ productivity.score }}"></div></div>
+            <div class="prod-mood">Mood: <span>{{ productivity.mood }}</span></div>
+            <div class="prod-meta">&#128218; Best Study Time: <strong>{{ productivity.study_time }}</strong></div>
+            <div class="prod-meta">&#128564; Sleep Quality: <strong>{{ productivity.sleep }}</strong></div>
+        </div>
+        <div class="prod-right">
+            {% for tip in productivity.tips %}
+            <div class="prod-tip">{{ tip }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- FOOD RECOMMENDATION -->
+    {% if food %}
+    <div class="section-title" id="food-section">&#127860; Food Recommendation</div>
+    <div class="food-card">
+        <div class="food-header">
+            <span class="food-emoji">{{ food.emoji }}</span>
+            <span class="food-title">{{ food.title }}</span>
+        </div>
+        <div class="food-grid">
+            {% for item in food['items'] %}
+            <div class="food-item">
+                <div class="food-item-icon">{{ item.icon }}</div>
+                <div class="food-item-name">{{ item.name }}</div>
+                <div class="food-item-reason">{{ item.reason }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- PET SAFETY -->
+    {% if pet %}
+    <div class="section-title" id="pet-section">&#128062; Pet Safety</div>
+    {% if pet.alert %}
+    <div class="alert-banner alert-{{ pet.alert.level }}" style="margin-bottom:14px">
+        <span class="alert-icon">&#128062;</span>
+        <div><div class="alert-title">{{ pet.alert.msg }}</div></div>
+    </div>
+    {% endif %}
+    <div class="pet-grid">
+        {% for t in pet.tips %}
+        <div class="pet-card">
+            <span class="pet-icon">{{ t.icon }}</span>
+            <span class="pet-tip">{{ t.tip }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- PLANT CARE -->
+    {% if plant %}
+    <div class="section-title" id="plant-section">&#127807; Plant Care AI</div>
+    <div class="plant-card">
+        <div class="plant-status-row">
+            <div class="plant-status {{ 'water-yes' if plant.water_today else 'water-no' }}">
+                &#128167; {{ 'Water Plants Today' if plant.water_today else 'Skip Watering Today' }}
+            </div>
+            {% if plant.frost_warning %}
+            <div class="plant-status frost-warn">&#10052; Frost Warning Active!</div>
+            {% endif %}
+        </div>
+        <div class="plant-tips">
+            {% for t in plant.tips %}
+            <div class="plant-tip-item">
+                <span>{{ t.icon }}</span> {{ t.tip }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- PHOTOGRAPHY -->
+    {% if photography %}
+    <div class="section-title" id="photo-section">&#128247; Best Photography Time</div>
+    <div class="photo-card">
+        <div class="photo-left">
+            <div class="photo-score-label">Photography Score</div>
+            <div class="photo-score">{{ photography.score }}<span>/100</span></div>
+            <div class="photo-bar-track"><div class="photo-bar-fill" data-width="{{ photography.score }}"></div></div>
+            <div class="photo-golden">&#127749; Golden Hour:<br><strong>{{ photography.golden_hour }}</strong></div>
+        </div>
+        <div class="photo-right">
+            {% for t in photography.tips %}
+            <div class="photo-tip">{{ t.icon }} {{ t.tip }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if photography.spots %}
+    <div class="section-title">&#128205; Best Spots to Shoot in {{ weather.city }}</div>
+    <div class="spots-grid">
+        {% for spot in photography.spots %}
+        <div class="spot-card">
+            <div class="spot-rank">&#127942; #{{ loop.index }}</div>
+            <div class="spot-name">{{ spot.name }}</div>
+            <div class="spot-time">&#9200; Best Time: <strong>{{ spot.best_time }}</strong></div>
+            <div class="spot-why">&#10024; {{ spot.why }}</div>
+            <div class="spot-how">&#128652; {{ spot.how }}</div>
+            <a class="spot-map-btn"
+               href="{{ spot.maps_url if spot.maps_url else 'https://www.google.com/maps/search/' + spot.name + '+' + weather.city }}"
+               target="_blank">&#127758; Open in Google Maps</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="spot-no-data">&#128205; Explore local parks, waterfronts and historic areas in {{ weather.city }} during golden hour for the best shots!</div>
+    {% endif %}
+    {% endif %}
+
+    <!-- FARMING INTELLIGENCE -->
+    {% if farming %}
+    <div class="section-title" id="farming-section">&#127806; Smart Farming Intelligence</div>
+    <div class="farming-grid">
+        {% for f in farming %}
+        <div class="farming-card">
+            <span class="farming-icon">{{ f.icon }}</span>
+            <span class="farming-tip">{{ f.tip }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ENERGY OPTIMIZER -->
+    {% if energy %}
+    <div class="section-title" id="energy-section">&#9889; Energy Consumption Optimizer</div>
+    <div class="energy-grid">
+        {% for e in energy %}
+        <div class="energy-card">
+            <span class="energy-icon">{{ e.icon }}</span>
+            <span class="energy-tip">{{ e.tip }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 3-DAY FORECAST -->
+    {% if forecast %}
+    <div class="section-title" id="forecast-section">&#128197; 3-Day Forecast</div>
+    <div class="forecast-grid">
+        {% for day in forecast %}
+        <div class="forecast-card">
+            <div class="forecast-day">{{ day.day }}</div>
+            <div class="forecast-date">{{ day.date }}</div>
+            <div class="forecast-desc">{{ day.description }}</div>
+            <div class="forecast-temps">
+                <span class="temp-max">{{ day.max_temp }}&deg;</span>
+                <span class="temp-min">{{ day.min_temp }}&deg;</span>
+            </div>
+            <div class="forecast-humidity">&#128167; {{ day.humidity }}%</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state">
+        <div class="anim-earth">
+            <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <radialGradient id="earthGrad" cx="40%" cy="35%">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#0369a1"/>
+                    </radialGradient>
+                </defs>
+                <circle cx="60" cy="60" r="50" fill="url(#earthGrad)" opacity="0.9"/>
+                <ellipse cx="48" cy="52" rx="14" ry="18" fill="#22c55e" opacity="0.85"/>
+                <ellipse cx="72" cy="45" rx="10" ry="13" fill="#22c55e" opacity="0.8"/>
+                <ellipse cx="65" cy="70" rx="12" ry="9" fill="#22c55e" opacity="0.75"/>
+                <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+                <ellipse cx="60" cy="60" rx="58" ry="14" fill="none" stroke="rgba(99,102,241,0.4)" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <g class="orbit-group">
+                    <circle cx="118" cy="60" r="4" fill="#a78bfa"/>
+                    <animateTransform attributeName="transform" type="rotate" from="0 60 60" to="360 60 60" dur="4s" repeatCount="indefinite"/>
+                </g>
+            </svg>
+        </div>
+        <h3>Search for a city to get started</h3>
+        <p>Enter any city name above to see real-time weather, AI analysis, health risks, farming tips, and more</p>
+
+        <div class="preview-cards">
+            <div class="preview-card">
+                <div class="preview-anim">
+                    <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse cx="40" cy="18" rx="28" ry="14" fill="#475569"/>
+                        <ellipse cx="28" cy="22" rx="18" ry="10" fill="#64748b"/>
+                        <line class="rain-line r1" x1="25" y1="36" x2="22" y2="50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+                        <line class="rain-line r2" x1="38" y1="36" x2="35" y2="50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+                        <line class="rain-line r3" x1="51" y1="36" x2="48" y2="50" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+                        <line class="rain-line r4" x1="32" y1="42" x2="29" y2="56" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round"/>
+                        <line class="rain-line r5" x1="45" y1="42" x2="42" y2="56" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="preview-label">Rain Detection</div>
+            </div>
+            <div class="preview-card">
+                <div class="preview-anim">
+                    <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse cx="40" cy="16" rx="26" ry="12" fill="#94a3b8"/>
+                        <circle class="snow-flake sf1" cx="20" cy="38" r="3" fill="#e0f2fe" opacity="0.9"/>
+                        <circle class="snow-flake sf2" cx="35" cy="44" r="2.5" fill="#e0f2fe" opacity="0.85"/>
+                        <circle class="snow-flake sf3" cx="50" cy="36" r="3.5" fill="#e0f2fe" opacity="0.9"/>
+                        <circle class="snow-flake sf4" cx="62" cy="48" r="2" fill="#e0f2fe" opacity="0.8"/>
+                        <circle class="snow-flake sf5" cx="28" cy="52" r="2" fill="#e0f2fe" opacity="0.75"/>
+                    </svg>
+                </div>
+                <div class="preview-label">Snow Forecast</div>
+            </div>
+            <div class="preview-card">
+                <div class="preview-anim">
+                    <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse class="wx-cloud c1" cx="38" cy="22" rx="28" ry="14" fill="#475569" opacity="0.9"/>
+                        <ellipse class="wx-cloud c2" cx="22" cy="30" rx="18" ry="10" fill="#64748b" opacity="0.85"/>
+                        <ellipse class="wx-cloud c3" cx="55" cy="28" rx="22" ry="11" fill="#3f4f63" opacity="0.9"/>
+                    </svg>
+                </div>
+                <div class="preview-label">Cloud Analysis</div>
+            </div>
+            <div class="preview-card">
+                <div class="preview-anim">
+                    <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="40" cy="30" r="20" fill="none" stroke="#6366f1" stroke-width="1.5" opacity="0.5"/>
+                        <circle cx="40" cy="30" r="13" fill="none" stroke="#8b5cf6" stroke-width="1.5" opacity="0.7"/>
+                        <circle cx="40" cy="30" r="6" fill="#a78bfa" opacity="0.9"/>
+                        <circle cx="40" cy="30" r="20" fill="none" stroke="#6366f1" stroke-width="2" opacity="0.8">
+                            <animate attributeName="r" values="20;28;20" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <line x1="40" y1="10" x2="40" y2="17" stroke="#6366f1" stroke-width="1.5" opacity="0.6"/>
+                        <line x1="40" y1="43" x2="40" y2="50" stroke="#6366f1" stroke-width="1.5" opacity="0.6"/>
+                        <line x1="20" y1="30" x2="27" y2="30" stroke="#6366f1" stroke-width="1.5" opacity="0.6"/>
+                        <line x1="53" y1="30" x2="60" y2="30" stroke="#6366f1" stroke-width="1.5" opacity="0.6"/>
+                    </svg>
+                </div>
+                <div class="preview-label">AI Predictions</div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+
+</div>
+
+<!-- AI COMPANION CHATBOT -->
+<button class="chat-fab" id="chat-fab" onclick="toggleChat()">&#129302;</button>
+
+<div class="chat-widget" id="chat-widget">
+    <div class="chat-header">
+        <div class="chat-header-left">
+            <div class="chat-avatar">&#129302;</div>
+            <div>
+                <div class="chat-title">NEBULA AI Assistant</div>
+                <div class="chat-status">&#9679; Online</div>
+            </div>
+        </div>
+        <button class="chat-close" onclick="toggleChat()">&#10005;</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+        <div class="chat-msg bot">
+            <div class="chat-bubble">Hi! I'm your personal weather assistant. Ask me anything like:
+
+&#8226; "What should I wear today?"
+&#8226; "Can I go jogging?"
+&#8226; "Is it safe to drive?"
+&#8226; "Will weather affect my headache?"
+&#8226; "Should I carry an umbrella?"</div>
+        </div>
+    </div>
+    <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button onclick="sendChat()">&#10148;</button>
+    </div>
+</div>
+
+<script>
+    const WEATHER_TYPE = "{{ weather_type }}";
+    const WEATHER_DATA = {
+        city: "{{ weather.city if weather else '' }}",
+        temp: "{{ weather.temp if weather else '' }}",
+        desc: "{{ weather.description if weather else '' }}",
+        humidity: "{{ weather.humidity if weather else '' }}",
+        wind: "{{ weather.wind if weather else '' }}",
+        uv: "{{ weather.uv_index if weather else '0' }}",
+        feels_like: "{{ weather.feels_like if weather else '' }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
