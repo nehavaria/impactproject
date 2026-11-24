@@ -31,7 +31,6 @@ Thumbs.db
 *.log
 
 # Large ML model files
-*.pkl
 *.h5
 *.model
 weatherHistory.csv
